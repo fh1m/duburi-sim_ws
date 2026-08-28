@@ -3,16 +3,15 @@
   GENERATED FILE - do not edit.
 
   Produced by duburi_sim_worlds/scripts/gen_world.py from
-  courses/task_navigation.yaml and spec/arena.yaml. Edit those and re-run:
+  courses/rs_task_bins.yaml and spec/arena.yaml. Edit those and re-run:
 
       scripts/gen_world.py --all
 
-  Navigation task in isolation: the gate at ~16 m from the starting zone with the orange flare as the obstacle, and nothing else in the water.
-Drill the gate approach without the drums and bump flares in frame to confuse the detector. Clear-ish water so a failure here is a control or alignment failure, not a perception one -- move to sauvc26_final for the murky version.
-SHORT RANGE ON PURPOSE. sauvc26_final holds the rulebook's ~16 m start-to-gate distance; this course puts the gate at 7 m so a run is a gate approach and not 90 s of open-water transit first. The two are meant to be used together: drill here, verify the real distance there.
+  RoboSub Task 3 in isolation: four bins, both roles present.
+A DOWNWARD-camera task. The role image sits on each bin's floor facing up, so the vehicle reads it from above while station-keeping for a marker drop -- which makes this the natural drill for the downward alignment path.
 -->
 <sdf version="1.9">
-  <world name="task_navigation">
+  <world name="rs_task_bins">
 
     <!-- ===================== SYSTEMS ===================== -->
     <plugin filename="gz-sim-physics-system"
@@ -83,9 +82,9 @@ SHORT RANGE ON PURPOSE. sauvc26_final holds the rulebook's ~16 m start-to-gate d
       <fog>
         <color>0.14 0.34 0.42 1</color>
         <type>linear</type>
-        <start>2.0</start>
+        <start>1.2</start>
         <end>22.0</end>
-        <density>0.018</density>
+        <density>0.028</density>
       </fog>
       <!-- Sky. Only ever seen through the surface looking up, and that is the
            point: without it the world above z=0 is flat background colour and
@@ -126,11 +125,11 @@ SHORT RANGE ON PURPOSE. sauvc26_final holds the rulebook's ~16 m start-to-gate d
     </light>
 
     <!-- ===================== POOL ===================== -->
-    <!-- Water surface at z = 0, floor at z = -1.6. -->
-    <model name="sauvc_pool">
+    <!-- Water surface at z = 0, floor at z = -2.1. -->
+    <model name="robosub_pool">
       <static>true</static>
       <link name="floor">
-        <pose>0 0 -1.6 0 0 0</pose>
+        <pose>0 0 -2.1 0 0 0</pose>
         <inertial>
           <pose>0 0 0 0 0 0</pose>
           <mass>1000</mass>
@@ -142,7 +141,7 @@ SHORT RANGE ON PURPOSE. sauvc26_final holds the rulebook's ~16 m start-to-gate d
         </inertial>
         <visual name="floor_visual">
           <pose>0 0 0.005 0 0 0</pose>
-          <geometry><box><size>25 16 0.01</size></box></geometry>
+          <geometry><box><size>20 12 0.01</size></box></geometry>
           <material>
             <ambient>0.55 0.55 0.55 1</ambient>
             <diffuse>0.55 0.55 0.55 1</diffuse>
@@ -150,7 +149,7 @@ SHORT RANGE ON PURPOSE. sauvc26_final holds the rulebook's ~16 m start-to-gate d
             <emissive>0 0 0 1</emissive>
             <pbr>
               <metal>
-                <albedo_map>model://sauvc_textures/pool_floor.png</albedo_map>
+                <albedo_map>model://robosub_textures/pool_floor.png</albedo_map>
                 <metalness>0.0</metalness>
                 <roughness>0.85</roughness>
               </metal>
@@ -159,7 +158,7 @@ SHORT RANGE ON PURPOSE. sauvc26_final holds the rulebook's ~16 m start-to-gate d
         </visual>
         <collision name="floor_collision">
           <pose>0 0 -0.05 0 0 0</pose>
-          <geometry><box><size>25 16 0.1</size></box></geometry>
+          <geometry><box><size>20 12 0.1</size></box></geometry>
         </collision>
       </link>
       <link name="wall_x_pos">
@@ -174,8 +173,8 @@ SHORT RANGE ON PURPOSE. sauvc26_final holds the rulebook's ~16 m start-to-gate d
           </inertia>
         </inertial>
         <visual name="wall_x_pos_visual">
-          <pose>12.5 0 -0.8 0 0 0</pose>
-          <geometry><box><size>0.01 16 1.6</size></box></geometry>
+          <pose>10 0 -1.05 0 0 0</pose>
+          <geometry><box><size>0.01 12 2.1</size></box></geometry>
           <material>
             <ambient>0.55 0.55 0.55 1</ambient>
             <diffuse>0.55 0.55 0.55 1</diffuse>
@@ -183,7 +182,7 @@ SHORT RANGE ON PURPOSE. sauvc26_final holds the rulebook's ~16 m start-to-gate d
             <emissive>0 0 0 1</emissive>
             <pbr>
               <metal>
-                <albedo_map>model://sauvc_textures/pool_wall_long.png</albedo_map>
+                <albedo_map>model://robosub_textures/pool_wall_long.png</albedo_map>
                 <metalness>0.0</metalness>
                 <roughness>0.85</roughness>
               </metal>
@@ -191,8 +190,8 @@ SHORT RANGE ON PURPOSE. sauvc26_final holds the rulebook's ~16 m start-to-gate d
           </material>
         </visual>
         <collision name="wall_x_pos_collision">
-          <pose>12.605 0 -0.8 0 0 0</pose>
-          <geometry><box><size>0.2 16.4 1.6</size></box></geometry>
+          <pose>10.105 0 -1.05 0 0 0</pose>
+          <geometry><box><size>0.2 12.4 2.1</size></box></geometry>
         </collision>
       </link>
       <link name="wall_x_neg">
@@ -207,8 +206,8 @@ SHORT RANGE ON PURPOSE. sauvc26_final holds the rulebook's ~16 m start-to-gate d
           </inertia>
         </inertial>
         <visual name="wall_x_neg_visual">
-          <pose>-12.5 0 -0.8 0 0 0</pose>
-          <geometry><box><size>0.01 16 1.6</size></box></geometry>
+          <pose>-10 0 -1.05 0 0 0</pose>
+          <geometry><box><size>0.01 12 2.1</size></box></geometry>
           <material>
             <ambient>0.55 0.55 0.55 1</ambient>
             <diffuse>0.55 0.55 0.55 1</diffuse>
@@ -216,7 +215,7 @@ SHORT RANGE ON PURPOSE. sauvc26_final holds the rulebook's ~16 m start-to-gate d
             <emissive>0 0 0 1</emissive>
             <pbr>
               <metal>
-                <albedo_map>model://sauvc_textures/pool_wall_long.png</albedo_map>
+                <albedo_map>model://robosub_textures/pool_wall_long.png</albedo_map>
                 <metalness>0.0</metalness>
                 <roughness>0.85</roughness>
               </metal>
@@ -224,8 +223,8 @@ SHORT RANGE ON PURPOSE. sauvc26_final holds the rulebook's ~16 m start-to-gate d
           </material>
         </visual>
         <collision name="wall_x_neg_collision">
-          <pose>-12.605 0 -0.8 0 0 0</pose>
-          <geometry><box><size>0.2 16.4 1.6</size></box></geometry>
+          <pose>-10.105 0 -1.05 0 0 0</pose>
+          <geometry><box><size>0.2 12.4 2.1</size></box></geometry>
         </collision>
       </link>
       <link name="wall_y_pos">
@@ -240,8 +239,8 @@ SHORT RANGE ON PURPOSE. sauvc26_final holds the rulebook's ~16 m start-to-gate d
           </inertia>
         </inertial>
         <visual name="wall_y_pos_visual">
-          <pose>0 8 -0.8 0 0 0</pose>
-          <geometry><box><size>25 0.01 1.6</size></box></geometry>
+          <pose>0 6 -1.05 0 0 0</pose>
+          <geometry><box><size>20 0.01 2.1</size></box></geometry>
           <material>
             <ambient>0.55 0.55 0.55 1</ambient>
             <diffuse>0.55 0.55 0.55 1</diffuse>
@@ -249,7 +248,7 @@ SHORT RANGE ON PURPOSE. sauvc26_final holds the rulebook's ~16 m start-to-gate d
             <emissive>0 0 0 1</emissive>
             <pbr>
               <metal>
-                <albedo_map>model://sauvc_textures/pool_wall_short.png</albedo_map>
+                <albedo_map>model://robosub_textures/pool_wall_short.png</albedo_map>
                 <metalness>0.0</metalness>
                 <roughness>0.85</roughness>
               </metal>
@@ -257,8 +256,8 @@ SHORT RANGE ON PURPOSE. sauvc26_final holds the rulebook's ~16 m start-to-gate d
           </material>
         </visual>
         <collision name="wall_y_pos_collision">
-          <pose>0 8.105 -0.8 0 0 0</pose>
-          <geometry><box><size>25 0.2 1.6</size></box></geometry>
+          <pose>0 6.105 -1.05 0 0 0</pose>
+          <geometry><box><size>20 0.2 2.1</size></box></geometry>
         </collision>
       </link>
       <link name="wall_y_neg">
@@ -273,8 +272,8 @@ SHORT RANGE ON PURPOSE. sauvc26_final holds the rulebook's ~16 m start-to-gate d
           </inertia>
         </inertial>
         <visual name="wall_y_neg_visual">
-          <pose>0 -8 -0.8 0 0 0</pose>
-          <geometry><box><size>25 0.01 1.6</size></box></geometry>
+          <pose>0 -6 -1.05 0 0 0</pose>
+          <geometry><box><size>20 0.01 2.1</size></box></geometry>
           <material>
             <ambient>0.55 0.55 0.55 1</ambient>
             <diffuse>0.55 0.55 0.55 1</diffuse>
@@ -282,7 +281,7 @@ SHORT RANGE ON PURPOSE. sauvc26_final holds the rulebook's ~16 m start-to-gate d
             <emissive>0 0 0 1</emissive>
             <pbr>
               <metal>
-                <albedo_map>model://sauvc_textures/pool_wall_short.png</albedo_map>
+                <albedo_map>model://robosub_textures/pool_wall_short.png</albedo_map>
                 <metalness>0.0</metalness>
                 <roughness>0.85</roughness>
               </metal>
@@ -290,42 +289,79 @@ SHORT RANGE ON PURPOSE. sauvc26_final holds the rulebook's ~16 m start-to-gate d
           </material>
         </visual>
         <collision name="wall_y_neg_collision">
-          <pose>0 -8.105 -0.8 0 0 0</pose>
-          <geometry><box><size>25 0.2 1.6</size></box></geometry>
+          <pose>0 -6.105 -1.05 0 0 0</pose>
+          <geometry><box><size>20 0.2 2.1</size></box></geometry>
         </collision>
+      </link>
+      <link name="water_surface">
+        <pose>0 0 0 0 0 0</pose>
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1</mass>
+          <inertia>
+            <ixx>1</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>1</iyy><iyz>0</iyz>
+            <izz>1</izz>
+          </inertia>
+        </inertial>
+        <visual name="water_surface_visual">
+          <pose>0 0 0 0 0 0</pose>
+          <cast_shadows>false</cast_shadows>
+          <transparency>0.62</transparency>
+          <geometry><box><size>20 12 0.01</size></box></geometry>
+          <material>
+            <ambient>0.95 0.95 0.95 1</ambient>
+            <diffuse>0.95 0.95 0.95 1</diffuse>
+            <specular>0.35 0.35 0.35 1</specular>
+            <emissive>0.22 0.22 0.22 1</emissive>
+            <pbr>
+              <metal>
+                <albedo_map>model://robosub_textures/water_surface.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>0.15</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
       </link>
     </model>
 
     <!-- ===================== PROPS ===================== -->
     <include>
-      <uri>model://sauvc_starting_zone</uri>
-      <name>start</name>
-      <pose>-11.8 0 0 0 0 0</pose>
+      <uri>model://robosub_bin_survey_repair</uri>
+      <name>bin_sr_a</name>
+      <pose>0 0.6 -2.1 0 0 0</pose>
     </include>
 
     <include>
-      <uri>model://sauvc_final_gate</uri>
-      <name>gate</name>
-      <pose>-4.8 0 -1.6 0 0 0</pose>
+      <uri>model://robosub_bin_search_rescue</uri>
+      <name>bin_rescue_a</name>
+      <pose>0 -0.6 -2.1 0 0 0</pose>
     </include>
 
     <include>
-      <uri>model://sauvc_orange_flare</uri>
-      <name>flare_obstacle</name>
-      <pose>-6.8 0 -1.6 0 0 0</pose>
+      <uri>model://robosub_bin_survey_repair</uri>
+      <name>bin_sr_b</name>
+      <pose>0.9 0.6 -2.1 0 0 0</pose>
     </include>
 
     <include>
-      <uri>https://fuel.gazebosim.org/1.0/openrobotics/models/waves</uri>
-      <name>water_surface</name>
-      <pose>0 0 0 0 0 0</pose>
+      <uri>model://robosub_bin_search_rescue</uri>
+      <name>bin_rescue_b</name>
+      <pose>0.9 -0.6 -2.1 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>model://robosub_path_marker</uri>
+      <name>path_in</name>
+      <pose>-1.6 0 -2.1 0 0 0</pose>
     </include>
 
     <!-- ===================== VEHICLE ===================== -->
     <include>
       <uri>model://duburi_heavy</uri>
       <name>duburi</name>
-      <pose>-11.8 0 -0.3 0 0 0</pose>
+      <pose>-3 0 -0.7 0 0 0</pose>
     </include>
 
   </world>

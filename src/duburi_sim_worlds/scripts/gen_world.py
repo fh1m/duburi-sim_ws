@@ -58,7 +58,31 @@ SCENE_DEFAULTS = {
     "fog_end": 22.0,
     "fog_density": 0.028,
     "shadows": True,
+    # plane | gerstner | none  -- see WATER_SURFACES below.
+    "water_surface": "plane",
 }
+
+# How the water surface at z = 0 is drawn.
+#
+#   plane     a translucent generated texture. Static, cheap, always available.
+#   gerstner  Gazebo's own animated Gerstner-wave surface, pulled from Fuel.
+#             VERIFIED 2026-08-29 to render in CAMERA SENSOR frames, not just
+#             the GUI -- a controlled A/B on one scene changed 48.7 % of pixels
+#             (see TROUBLESHOOTING.md). That mattered because gz-sim renders two
+#             separate scenes and the world's <fog> famously reaches only one of
+#             them, so "it looks right in the GUI" proves nothing about datasets.
+#   none      no surface at all; the sky shows raw.
+#
+# The Fuel URI is referenced rather than vendored: Gazebo downloads and caches
+# it on first use, so nothing of unclear provenance lands in this repo. The
+# trade is that the FIRST run of a gerstner course needs network. Courses using
+# it should say so.
+WATER_SURFACES = ("plane", "gerstner", "none")
+
+# openrobotics/waves -- the first-party Gazebo asset. Its shaders carry the
+# Apache-2.0 UUV Simulator header; other teams' copies of this model are copies
+# of exactly this, and theirs are git-lfs pointers rather than usable meshes.
+GERSTNER_URI = "https://fuel.gazebosim.org/1.0/openrobotics/models/waves"
 
 # Named lighting / fog presets courses can pick with scene.lighting: clear|competition|murky
 #
@@ -153,13 +177,16 @@ def _include(uri: str, name: str, pose: str) -> str:
 
 def resolve_pool(course: dict, spec: dict) -> dict:
     """Resolve the course's `pool` field into a concrete pool config."""
-    pool = course.get("pool", "sauvc")
+    # A named preset is a COMPETITION -- every competition with a spec file
+    # brings its own pool. This used to accept the single literal "sauvc".
+    pool = course.get("pool", course.get("competition", "sauvc"))
     if isinstance(pool, str):
-        if pool != "sauvc":
+        known = pl.competitions()
+        if pool not in known:
             raise ValueError(
-                f"unknown pool preset '{pool}'; use 'sauvc' or an inline mapping"
-            )
-        return dict(spec["pool"])
+                f"unknown pool preset {pool!r}; "
+                f"use one of {', '.join(known)} or an inline mapping")
+        return dict(pl.load_spec(competition=pool)["pool"])
 
     cfg = dict(spec["pool"])
     cfg.update(pool)
@@ -172,9 +199,8 @@ def resolve_pool(course: dict, spec: dict) -> dict:
         print(
             f"  warning: pool depth {cfg['depth']} m differs from the arena spec "
             f"({spec['pool']['depth']} m). Depth-spanning props "
-            "(sauvc_qual_gate, sauvc_orange_flare) were generated for the spec "
-            "depth and will not reach. Update spec/arena.yaml and re-run "
-            "--all instead.",
+            "were generated for the spec depth and will not reach. Update "
+            "spec/<competition>.yaml and re-run --all instead.",
             file=sys.stderr,
         )
     return cfg
@@ -250,9 +276,19 @@ def build_vehicle(course: dict, pool_cfg: dict):
     return _include(model_name, name, pose_str), name
 
 
-def generate(course_path: str, spec: dict, outdir: str = WORLDS_DIR) -> str:
+def generate(course_path: str, spec: dict = None, outdir: str = WORLDS_DIR) -> str:
     with open(course_path) as f:
         course = yaml.safe_load(f)
+
+    # The COURSE chooses its competition, so each world is generated against its
+    # own spec. Passing one spec for every course is what would silently build a
+    # RoboSub world against SAUVC's 1.6 m pool. An explicit `spec` still wins so
+    # `--spec` keeps working.
+    competition = course.get("competition", course.get("pool", "sauvc"))
+    if not isinstance(competition, str):
+        competition = "sauvc"
+    if spec is None:
+        spec = pl.load_spec(competition=competition)
 
     stem = os.path.splitext(os.path.basename(course_path))[0]
     world_name = course.get("name", stem)
@@ -274,7 +310,22 @@ def generate(course_path: str, spec: dict, outdir: str = WORLDS_DIR) -> str:
     physics = dict(PHYSICS_DEFAULTS)
     physics.update(course.get("physics") or {})
 
+    water_surface = scene.get("water_surface", "plane")
+    if water_surface not in WATER_SURFACES:
+        raise ValueError(
+            f"unknown water_surface {water_surface!r}; "
+            f"known: {', '.join(WATER_SURFACES)}")
+
     props_xml, dynamic = build_props(course, spec, pool_cfg)
+    if water_surface == "gerstner":
+        # Sits at z=0 like the plane it replaces. No collision (the model is
+        # visual-only), so `surface()` still works -- the vehicle is not pushing
+        # against a lid.
+        props_xml += (
+            f'\n\n<include>\n  <uri>{GERSTNER_URI}</uri>\n'
+            f'  <name>water_surface</name>\n'
+            f'  <pose>0 0 0 0 0 0</pose>\n</include>'
+        )
     vehicle_xml, vehicle_name = build_vehicle(course, pool_cfg)
 
     enabled = ([vehicle_name] if vehicle_name else []) + dynamic
@@ -301,7 +352,7 @@ def generate(course_path: str, spec: dict, outdir: str = WORLDS_DIR) -> str:
         fog_end=scene["fog_end"],
         fog_density=scene["fog_density"],
         floor_z=f"{-pool_cfg['depth']:.6g}",
-        pool=_indent(pl.pool(spec, pool_cfg), 2),
+        pool=_indent(pl.pool(spec, pool_cfg, water_surface), 2),
         props=_indent(props_xml, 2),
         vehicle=_indent(vehicle_xml, 2),
     )
@@ -365,7 +416,10 @@ def main() -> None:
         help="Regenerate textures, props and every course in courses/.",
     )
     parser.add_argument("--list", action="store_true", help="List available courses.")
-    parser.add_argument("--spec", default=pl.DEFAULT_SPEC, help="Arena spec YAML.")
+    parser.add_argument(
+        "--spec", default=None,
+        help="Arena spec YAML. Default: each course picks its own from "
+             "its `competition:` key.")
     parser.add_argument("--outdir", default=WORLDS_DIR, help="Output directory.")
     args = parser.parse_args()
 
@@ -384,7 +438,7 @@ def main() -> None:
     else:
         parser.error("give one or more course files, or --all")
 
-    spec = pl.load_spec(args.spec)
+    spec = pl.load_spec(args.spec) if args.spec else None
     for path in targets:
         print(f"--- {os.path.basename(path)}")
         print(f"  wrote {generate(path, spec, args.outdir)}")
