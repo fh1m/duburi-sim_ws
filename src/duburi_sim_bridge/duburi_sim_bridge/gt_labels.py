@@ -29,6 +29,9 @@ CLASSES = [
     'drum_blue',
     'drum_red_pinger',
     'starting_zone',
+    # Appended, never inserted: these strings are the YOLO class INDICES, so
+    # reordering them silently relabels every dataset recorded before the edit.
+    'target_mat',
 ]
 
 MODEL_TO_CLASS = {
@@ -42,6 +45,7 @@ MODEL_TO_CLASS = {
     'sauvc_drum_blue': 'drum_blue',
     'sauvc_drum_red_pinger': 'drum_red_pinger',
     'sauvc_starting_zone': 'starting_zone',
+    'sauvc_target_mat': 'target_mat',
 }
 
 # Approximate axis-aligned half-extents in metres (x, y, z) in prop frame.
@@ -57,7 +61,24 @@ PROP_HALF_EXTENTS = {
     'sauvc_drum_blue': (0.30, 0.30, 0.15),
     'sauvc_drum_red_pinger': (0.30, 0.30, 0.15),
     'sauvc_starting_zone': (0.70, 0.70, 0.02),
+    'sauvc_target_mat': (3.0, 1.1, 0.01),
 }
+
+# MODEL_TO_CLASS and PROP_HALF_EXTENTS must list the SAME models.
+#
+# A model in one table but not the other used to be skipped in silence at the
+# `half is None` guard below: sauvc_target_mat was added to MODEL_TO_CLASS,
+# classes.txt gained a target_mat entry, and 1469 recorded frames were labelled
+# with exactly zero mat instances. The dataset looked complete and the class was
+# simply never learnable. Fail at import instead.
+_ONLY_CLASS = set(MODEL_TO_CLASS) - set(PROP_HALF_EXTENTS)
+_ONLY_EXTENT = set(PROP_HALF_EXTENTS) - set(MODEL_TO_CLASS)
+if _ONLY_CLASS or _ONLY_EXTENT:
+    raise RuntimeError(
+        'gt_labels tables disagree; every prop needs a class AND half-extents. '
+        f'missing half-extents: {sorted(_ONLY_CLASS)}; '
+        f'missing class: {sorted(_ONLY_EXTENT)}'
+    )
 
 # Camera extrinsics relative to base_link (from configs.yaml); optical: x right, y down, z forward.
 FRONT_CAM_POSE = (0.2, 0.0, 0.0)  # x,y,z in base_link
