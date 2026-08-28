@@ -176,7 +176,101 @@ Two failure shapes are worth naming, because unit tests cannot see either:
 | `move_back_dist` / `move_lateral_dist` | refuse without DVL; stall guard was too tight | guard widened |
 | `fire` | fails loudly with no payload | OK |
 | `surface` | never confirms in sim | Type A, documented above |
-| `vision_align` / `vision_move` | never-fail contract holds | see sidecar note |
+| `vision_align` / `vision_move` | never-fail contract holds | see "class allowlist" below |
+
+### `Failed to render beam markers` in a headless run
+
+Harmless. `<visualize>true</visualize>` on the DVL draws the four beams in the
+**Gazebo GUI**, and headless has no renderer for GUI markers, so gz warns once
+per attempt. The beams are still published as an RViz `MarkerArray` on
+`/duburi/sim/dvl/beams`, which is the path that works headless.
+
+### Verifying RViz displays: count subscribers BY NAME
+
+`ros2 run duburi_sim_bridge rviz_check` asserts every topic the config
+references is subscribed **by RViz specifically**, not merely subscribed.
+
+The first version counted subscribers and gave a **false pass**: `underwater_fx`
+also subscribes to both camera `image_raw` topics, so the count was >=1 whether
+or not the display was switched on -- and the camera displays were in fact
+saved with `Enabled: false`. `ros2 topic info -v` names the subscribing nodes;
+ask for RViz by name.
+
+Two related traps:
+- RViz **rewrites the config on exit**. If it was opened without the sim running
+  it will have reset `Fixed Frame` (no `odom` frame exists) and left displays
+  off, and then saved that. A `*` in the title bar means the file on disk is
+  about to change.
+- A display that is off looks identical to a display whose topic is wrong.
+
+### The vehicle shadows the drum it is about to drop into
+
+Measured from the bottom camera hovering over a drum, i.e. the exact instant of
+the Target Acquisition drop:
+
+| surface | RGB | colour spread |
+|---|---|---|
+| pool floor (control) | `[125, 154, 172]` | **46.8** |
+| drum base, emissive 0.25 | `[115, 122, 129]` | **13.5** |
+| drum base, emissive 0.55 | `[138, 149, 160]` | **22.0** |
+
+The drum base is the entire colour cue for choosing blue-vs-red, and at drop
+range it desaturates towards grey. This is **not a texture failure** -- the
+albedo maps are correct (`drum_wall_blue.png` mean RGB `[18, 59, 189]`) and the
+drums render distinctly blue and red from the FRONT camera at normal range. It
+is the vehicle casting its own shadow on the prop directly beneath it.
+
+That is physically right, and it is a real problem competition teams have. The
+emissive lift on the drum base is raised to 0.55 to recover what can be
+recovered without making the drum glow. **Do not tune a bin detector on the
+front camera and assume it transfers to the drop.**
+
+Measure it yourself rather than eyeballing a fogged frame:
+
+```bash
+ros2 topic echo /duburi/sim/bottom_camera/image_raw --once   # RAW render
+```
+
+`image_raw` is the clean Gazebo render; `underwater_fx` publishes its degraded
+copy to **`image_fx`**, a different topic. Measuring the wrong one will tell you
+the renderer is broken when it is not.
+
+### The class allowlist, and the silent `[]`
+
+A detector that matches **zero** classes returns `[]` on every frame forever. It
+is not an error and the pipeline looks healthy: topics publish, FPS is normal,
+the HUD draws. The one signal is a single line at startup:
+
+```
+[YOLO ] class_allowlist=[...] matched 0 classes in model. Detector will return []
+        for every frame. Available: [...]
+```
+
+Two things make this easy to trip:
+
+- **`bin_fire_blood.pt` has NO `bin` class.** The stem names the dataset, not the
+  classes — the weights contain exactly `{0: blood, 1: fire}`. A bin mission
+  asking for `classes:=bin` detects nothing, silently. The sim's downward
+  detector therefore defaults to `dwn_classes:=fire,blood`.
+- **A missing `<stem>.yaml` sidecar is NOT itself the failure.** The loader falls
+  back to the weights' embedded `names`. The failure is when the allowlist a
+  mission asks for does not intersect whatever names are in play.
+
+`gate_rescue_repair.pt` is `{0: gate, 1: rescue, 2: repair}`.
+
+### Vision in sim: `vision:=true` used to start nothing at all
+
+Fixed 2026-08-28. `IncludeLaunchDescription` does not scope its
+`launch_arguments`, so the manager include's `vision: 'false'` leaked into the
+outer scope and overwrote `stack.launch.py`'s own `vision` argument. The vision
+include then skipped itself via `IfCondition` — no error, no node, for any value
+of `vision:=`. That is why the older notes here tell you to run `--no-vision`.
+
+Both cameras now run: `duburi_sim stack` gives
+`/duburi_detector_forward` (sim front camera) and `/duburi_detector_downward`
+(sim bottom camera). If only one appears, check the `GroupAction(scoped=True)`
+around the manager include is still there — `test_sim_contract_drift.py` asserts
+it precisely because the failure is silent.
 
 ### `arc` reported a perfect result while 165° off  — FIXED
 
