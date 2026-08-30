@@ -6,7 +6,7 @@
 > updated; any remaining "sibling" phrasing is historical.
 
 **Read this first.** Gazebo Harmonic + ArduSub SITL for Mongla AUV (Duburi 4.5).
-Nested inside [`duburi_ws`](../..); autonomy lives in [`../../src`](../../src). MAVLink/camera surface so autonomy
+Nested inside [`duburi_ws`](../..); autonomy lives in [`../../src`](https://github.com/fh1m/duburi_ws/blob/main/src). MAVLink/camera surface so autonomy
 does not need sim-specific forks.
 
 ## 5-minute orientation
