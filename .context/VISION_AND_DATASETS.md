@@ -445,3 +445,105 @@ for exactly that argument.
 > Unexplained and pre-existing: every bounding-box frame also carries a
 > **class 242**, which is outside `DETECTION_CLASSES`. It predates this work and
 > appears on every course. Worth chasing before trusting a raw box count.
+
+## The task images are vendored artwork now, not a font (2026-08-31)
+
+RoboNation prints **Microsoft Fluent 3D** emoji — the gradient flame and the
+smooth magenta teardrop on the Task 3 and Task 4 slides are that set. They are
+MIT licensed, 256×256 RGBA with real shading, and `scripts/fetch_emoji.py`
+vendors the eight we need into `models/robosub_textures/emoji/` so a checkout
+builds the same props with no network.
+
+The font path is a **fallback**, and it is a poor one for two measured reasons.
+`NotoColorEmoji` is a CBDT bitmap face with a **single 109 px strike**, so every
+glyph was drawn at 109 px and resampled up to fill a 256 px placard or a 1024 px
+board — soft by construction, and most of why the props read as cartoonish next
+to a photograph. And Noto's droplet is **blue** where RoboNation's is magenta,
+so the old code collapsed the glyph to luminance and multiplied by a tint,
+throwing away the shading that makes it legible and leaving a flat pink blob.
+
+> **`droplet` is the DROP OF BLOOD (🩸), not the water droplet (💧).** Fluent has
+> both, and the first fetch took the wrong one — obvious the moment it rendered.
+> It matters beyond looks: a *blue* drop would make the sim task **easier** than
+> the pool task, because blue-vs-orange separates far more cleanly than
+> magenta-vs-orange. A test checks the artwork's own colour, not its filename.
+
+Role placards went 256 → 512 px, since the source is now a 256 px render rather
+than a 109 px strike and there is real detail to keep.
+
+## Normal maps — the map nothing here had
+
+Until now **no material in this tree used a normal map**, and SDF 1.9's
+`<pbr><metal>` has accepted one all along. A perfectly smooth surface with its
+detail painted into the albedo is the clearest single tell of a CG render, and
+the worst case for feature matching: descriptors key on local gradients, and a
+painted gradient does not move when the light does.
+
+`make_normal_map()` derives a tangent-space map from a height field (PVC
+extrusion seams, moulded-plastic pebbling, flare weave). `textured_material()`
+gained `normal_map=` and `double_sided=`.
+
+**Measured, by stripping every `<normal_map>` from the generated models and
+re-rendering the same frame** — only the map changes:
+
+| height fields | pixels differing >2 levels | mean abs diff |
+|---|---|---|
+| first attempt | 0.39 % | 0.098 |
+| **after raising amplitude and encode strength** | **4.85 %** | **0.473** |
+
+The first pass was applied but nearly a no-op — a feature that costs a texture
+fetch and earns nothing. Worth stating, because "it's in the SDF" is not
+evidence that a map is doing anything.
+
+## `box_type` was invalid, so no dataset had occlusion correctness
+
+The bounding-box sensors were declared `<box_type>2d</box_type>`. **`2d` is not a
+valid token** — the set is `full_2d`, `full_box_2d`, `visible_2d`,
+`visible_box_2d`, `3d` — so gz fell back to its default `BBT_FULLBOX2D`,
+documented as *"the full box of occluded objects"*.
+
+Every dataset captured here before 2026-08-31 therefore has **no occlusion
+correctness**: a crate hidden behind another crate got a full box, which is the
+exact defect the geometric AABB projector was replaced to fix. Two comments in
+the tree claimed the opposite, and both are corrected.
+
+An invalid token costs nothing visible. It does **not** print "Unknown bounding
+box type" (checked before and after, both zero), so nothing in a log ever said
+so. Now `visible_2d`.
+
+## One box per TOP-LEVEL MODEL — nested models do not help either
+
+The pool detectors are trained on **sub-features**: `gate_rescue_repair.pt`
+classifies `gate`/`rescue`/`repair`, `bin_fire_blood.pt` classifies
+`blood`/`fire`. The sim can only annotate **whole props**, so a dataset captured
+here still cannot train a model any mission runs. That is the largest remaining
+sim-to-real gap in vision, and it is now measured rather than assumed.
+
+Round 8 established that a `<visual>`-scope label does not create its own box.
+Round 9 tested the fallback the plan named — **nested `<model>`s**, since
+`Ogre2BoundingBoxCamera::MergeMultiLinksModels2D()` merges per-*link* boxes up
+to the model and a nested model looked like it should be its own merge group.
+
+Four runs on `rs_task_gate`, ~270 bbox frames each:
+
+| gate model label | signs | frame | labels emitted |
+|---|---|---|---|
+| `robosub_gate` | nested, 27/28 | plain links | **12 only** |
+| suppressed | nested, 27/28 | plain links | **27 only**, own box 195×36 |
+| suppressed | nested, 27/28 | nested, 12 | **12 only** |
+
+The middle row looks like success and is not. `repair` appeared only because
+nothing else under the gate carried a label — with the frame nested and
+labelled, 12 wins again. **gz collapses everything beneath a top-level model
+instance into one box and picks one label for it.** Nesting changes nothing.
+
+So the experiment was reverted whole: the gate is a flat model with a
+model-scope label again, and `repair`/`rescue` are **not** in
+`DETECTION_CLASSES`, because nothing emits them. The only path left is making
+each sub-feature its own **top-level model placed by the course**, which costs
+the joints that make the boards swing — a real trade, not a small edit.
+
+> **Class 242 identified.** Its box is 638×476 on a 640×480 image — the whole
+> frame. It is the pool shell or the Fuel `waves` surface, not a prop.
+> `box_labels.py:77` discards it (out of range), so no dataset is affected, but
+> any raw box count is off by one per frame.
